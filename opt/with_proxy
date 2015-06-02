@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+if [ -z "$PROXY_PORT" ]; then
+  echo "You must set the PROXY_PORT config var to create a TCP tunnel!"
+  exit 1
+fi
+
+tunnelHost="ec2-52-26-62-97.us-west-2.compute.amazonaws.com"
+tunnelPort="5001"
+
+# Start the TCP tunnel
+echo "Starting TCP tunnel on port ${PROXY_PORT}..."
+eval "ssh -i .ssh/heroku_proxy_rsa -R *:${tunnelPort}:localhost:${PROXY_PORT} -N heroku@${tunnelHost} &"
+echo "Tunnel running at ${tunnelHost}:${tunnelPort}"
+
+eval "$@"

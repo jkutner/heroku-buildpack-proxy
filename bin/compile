@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+# fail fast
+set -eu
+
+indent() {
+  sed -u 's/^/       /'
+}
+
+# parse args
+export BUILD_DIR=$1
+
+BP_DIR="$(cd "$(dirname "$0")" && pwd)"
+OPT_DIR=$BP_DIR/../opt/
+
+# cp the key
+mkdir -p $BUILD_DIR/.ssh
+openssl aes-256-cbc -d -in $OPT_DIR/heroku_proxy_rsa.enc -out $BUILD_DIR/.ssh/heroku_proxy_rsa -k $DEPLOY
+cp $OPT_DIR/heroku_proxy_rsa.pub $BUILD_DIR/.ssh
+cat << EOF > $BUILD_DIR/.ssh/known_hosts
+|1|gr9is9U0Dv3AJCOWNn7VMVAvuWk=|9h/apCuZ5nRpCCDvWzHtCBb8HYA= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBBB8icdxv/bxCPozpOsan9EMqse0lL7pR+udwI76MaEnO59hxzLO3rj2VW6qpcP5Kn14pjiMGn+rhIKtpi0/wDA=
+|1|zh6OLnOnd0QST+e5MmL4Z+qXnS0=|YkWnaIXxGF39AF4A3SiMZY5iGxE= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBBB8icdxv/bxCPozpOsan9EMqse0lL7pR+udwI76MaEnO59hxzLO3rj2VW6qpcP5Kn14pjiMGn+rhIKtpi0/wDA=
+EOF
+
+mkdir -p $BUILD_DIR/.heroku/bin
+cp $OPT_DIR/with_proxy $BUILD_DIR/.heroku/bin/
+chmod +x $BUILD_DIR/.heroku/bin/with_proxy
+
+mkdir -p $BUILD_DIR/.profile.d
+cat << EOF > $BUILD_DIR/.profile.d/proxy.sh
+export PATH=\$HOME/.heroku/bin:\$PATH
+EOF
