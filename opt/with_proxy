@@ -6,7 +6,7 @@ if [ -z "$PROXY_PORT" ]; then
 fi
 
 tunnelHost="ec2-52-26-62-97.us-west-2.compute.amazonaws.com"
-tunnelPort="5001"
+tunnelPort=$((RANDOM%4000+5000))
 
 # Start the TCP tunnel
 echo "Starting TCP tunnel on port ${PROXY_PORT}..."
