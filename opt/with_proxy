@@ -6,11 +6,20 @@ if [ -z "$PROXY_PORT" ]; then
 fi
 
 tunnelHost="ec2-52-26-62-97.us-west-2.compute.amazonaws.com"
-tunnelPort=$((RANDOM%4000+5000))
+tunnelPort=$((RANDOM%64535+1000))
+
+eval "$(ssh-agent -s)"
+eval "ssh-add-pass .ssh/proxy_rsa $SSH_PROXY_PASSPHRASE"
 
 # Start the TCP tunnel
 echo "Starting TCP tunnel on port ${PROXY_PORT}..."
-eval "ssh -i .ssh/heroku_proxy_rsa -R *:${tunnelPort}:localhost:${PROXY_PORT} -N heroku@${tunnelHost} &"
+eval "ssh -R *:${tunnelPort}:localhost:${PROXY_PORT} -N heroku@${tunnelHost} &"
+
+if [ $? -ne 0 ]; then
+  echo "Could not connect to proxy server. Your key may be expired. Please try redeploying."
+  exit 1
+fi
+
 echo "Tunnel running at ${tunnelHost}:${tunnelPort}"
 
 eval "$@"

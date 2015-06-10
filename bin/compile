@@ -8,25 +8,58 @@ indent() {
 }
 
 # parse args
-export BUILD_DIR=$1
+BUILD_DIR=$1
+CACHE_DIR=$2
 
 BP_DIR="$(cd "$(dirname "$0")" && pwd)"
 OPT_DIR=$BP_DIR/../opt/
 
+APT_CACHE_DIR="$CACHE_DIR/apt/cache"
+APT_STATE_DIR="$CACHE_DIR/apt/state"
+APT_OPTIONS="-o debug::nolocking=true -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
+
+mkdir -p "$APT_CACHE_DIR/archives/partial"
+mkdir -p "$APT_STATE_DIR/lists/partial"
+
+echo "-----> Installing proxy tools... "
+apt-get $APT_OPTIONS update | indent
+apt-get $APT_OPTIONS -y --force-yes -d install --reinstall expect tcl | indent
+mkdir -p $BUILD_DIR/.profile.d
+cat <<EOF >$BUILD_DIR/.profile.d/000_apt.sh
+export PATH="\$HOME/.apt/usr/bin:\$PATH"
+export LD_LIBRARY_PATH="\$HOME/.apt/usr/lib/x86_64-linux-gnu:\$HOME/.apt/usr/lib/i386-linux-gnu:\$HOME/.apt/usr/lib:\$LD_LIBRARY_PATH"
+export LIBRARY_PATH="\$HOME/.apt/usr/lib/x86_64-linux-gnu:\$HOME/.apt/usr/lib/i386-linux-gnu:\$HOME/.apt/usr/lib:\$LIBRARY_PATH"
+export INCLUDE_PATH="\$HOME/.apt/usr/include:\$INCLUDE_PATH"
+export CPATH="\$INCLUDE_PATH"
+export CPPPATH="\$INCLUDE_PATH"
+export PKG_CONFIG_PATH="\$HOME/.apt/usr/lib/x86_64-linux-gnu/pkgconfig:\$HOME/.apt/usr/lib/i386-linux-gnu/pkgconfig:\$HOME/.apt/usr/lib/pkgconfig:\$PKG_CONFIG_PATH"
+EOF
+
+for DEB in $(ls -1 $APT_CACHE_DIR/archives/*.deb); do
+  dpkg -x $DEB $BUILD_DIR/.apt/
+done
+
+# i don't even
+mkdir -p $BUILD_DIR/.apt/library/
+cp $BUILD_DIR/.apt/usr/share/tcltk/tcl8.6/init.tcl $BUILD_DIR/.apt/library/
+
 # cp the key
 mkdir -p $BUILD_DIR/.ssh
-openssl aes-256-cbc -d -in $OPT_DIR/heroku_proxy_rsa.enc -out $BUILD_DIR/.ssh/heroku_proxy_rsa -k $DEPLOY
-cp $OPT_DIR/heroku_proxy_rsa.pub $BUILD_DIR/.ssh
+cp $OPT_DIR/proxy_rsa $BUILD_DIR/.ssh
+cp $OPT_DIR/proxy_rsa.pub $BUILD_DIR/.ssh
 cat << EOF > $BUILD_DIR/.ssh/known_hosts
 |1|gr9is9U0Dv3AJCOWNn7VMVAvuWk=|9h/apCuZ5nRpCCDvWzHtCBb8HYA= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBBB8icdxv/bxCPozpOsan9EMqse0lL7pR+udwI76MaEnO59hxzLO3rj2VW6qpcP5Kn14pjiMGn+rhIKtpi0/wDA=
 |1|zh6OLnOnd0QST+e5MmL4Z+qXnS0=|YkWnaIXxGF39AF4A3SiMZY5iGxE= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBBB8icdxv/bxCPozpOsan9EMqse0lL7pR+udwI76MaEnO59hxzLO3rj2VW6qpcP5Kn14pjiMGn+rhIKtpi0/wDA=
 EOF
 
 mkdir -p $BUILD_DIR/.heroku/bin
+cp $OPT_DIR/ssh-add-pass $BUILD_DIR/.heroku/bin/
 cp $OPT_DIR/with_proxy $BUILD_DIR/.heroku/bin/
-chmod +x $BUILD_DIR/.heroku/bin/with_proxy
+
+chmod +x $BUILD_DIR/.heroku/bin/*
 
 mkdir -p $BUILD_DIR/.profile.d
 cat << EOF > $BUILD_DIR/.profile.d/proxy.sh
 export PATH=\$HOME/.heroku/bin:\$PATH
+export SSH_PROXY_PASSPHRASE="$(ruby -e "puts ENV['DEPLOY'].crypt('heroku')")"
 EOF
